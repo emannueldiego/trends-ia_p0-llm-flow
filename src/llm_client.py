@@ -1,15 +1,19 @@
 import json
+import logging
 from google import genai
 from google.genai import errors
 from src.prompts import montar_prompt_completo
 
+logger = logging.getLogger("p0_classificador")
+
 class LLMError(Exception):
-    """Exceção customizada para erros do LLM."""
     pass
 
 def chamar_llm(client: genai.Client, modelo: str, texto: str) -> dict:
-    """Faz a chamada à API e garante que um JSON válido seja retornado."""
     prompt_completo = montar_prompt_completo(texto)
+    
+    # Log seguro: registra apenas o tamanho da entrada, não o conteúdo
+    logger.info(f"Iniciando chamada ao LLM (modelo={modelo}, tamanho_texto={len(texto)} caracteres)")
     
     try:
         resposta = client.models.generate_content(
@@ -18,27 +22,28 @@ def chamar_llm(client: genai.Client, modelo: str, texto: str) -> dict:
         )
         conteudo = resposta.text.strip()
         
-        # Tratamento de resposta inesperada (blocos de código markdown)
         if conteudo.startswith("```json"):
             conteudo = conteudo.removeprefix("```json").removesuffix("```").strip()
         elif conteudo.startswith("```"):
             conteudo = conteudo.removeprefix("```").removesuffix("```").strip()
 
         try:
-            return json.loads(conteudo)
+            resultado = json.loads(conteudo)
+            logger.info(f"Resposta recebida e parseada. Categoria={resultado.get('categoria')}")
+            return resultado
         except json.JSONDecodeError:
+            logger.error("Falha ao decodificar JSON retornado pelo modelo.")
             raise LLMError("O modelo retornou uma resposta que não é um JSON válido.")
             
     except errors.APIError as e:
-        # Tratamento de credencial inválida
+        logger.error(f"Erro na API do Gemini. Código: {e.code}")
         if e.code in (401, 403):
             raise LLMError("Credencial inválida ou sem permissão. Verifique sua GEMINI_API_KEY.") from e
-        # Tratamento de limite excedido
         elif e.code == 429:
-            raise LLMError("Limite de requisições excedido. Aguarde um momento e tente novamente.") from e
+            raise LLMError("Limite de requisições excedido.") from e
         else:
-            raise LLMError(f"Falha na API do Gemini (Código {e.code}): {e.message}") from e
+            raise LLMError(f"Falha na API do Gemini (Código {e.code})") from e
             
     except Exception as e:
-        # Tratamento de falha de comunicação / timeout
-        raise LLMError(f"Falha de comunicação com o serviço de IA: {e}") from e
+        logger.error(f"Falha de comunicação/timeout: {type(e).__name__}")
+        raise LLMError(f"Falha de comunicação com o serviço de IA.") from e

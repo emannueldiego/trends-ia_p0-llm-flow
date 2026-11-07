@@ -3,7 +3,6 @@ import sys
 from dotenv import load_dotenv
 
 def carregar_configuracoes() -> dict:
-    """Carrega e valida as variáveis de ambiente."""
     load_dotenv()
     
     api_key = os.getenv("GEMINI_API_KEY")
@@ -12,5 +11,10 @@ def carregar_configuracoes() -> dict:
         sys.exit(1)
         
     modelo = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
     
-    return {"api_key": api_key, "modelo": modelo}
+    # Valida se o nível de log é válido
+    if log_level not in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
+        log_level = "INFO"
+        
+    return {"api_key": api_key, "modelo": modelo, "log_level": log_level}

@@ -1,18 +1,19 @@
 import sys
 from src.config import carregar_configuracoes
+from src.logger import configurar_logger
 from src.app import Classificador
 from src.llm_client import LLMError
 
 def main() -> int:
-    # 1. Carrega configuração
     config = carregar_configuracoes()
+    logger = configurar_logger(config["log_level"])
+    logger.info("Aplicação iniciada.")
+    
     app = Classificador(api_key=config["api_key"], modelo=config["modelo"])
 
-    # 2. Apresentação inicial
-    print("Classificador de mensagens (Nível Intermediário)")
+    print("Classificador de mensagens (Nível Avançado)")
     print("Digite a mensagem (ou 'sair' para encerrar):\n")
 
-    # 3. Captura da entrada
     while True:
         try:
             texto = input("> ").strip()
@@ -24,17 +25,18 @@ def main() -> int:
             print("Encerrando.")
             break
 
-        # 4. Chamada e Tratamento
         try:
             resultado = app.classificar(texto)
             print(f"\nCategoria: {resultado.get('categoria')}")
             print(f"Justificativa: {resultado.get('justificativa')}\n")
             
         except ValueError as e:
+            logger.warning("Entrada inválida recebida do usuário.")
             print(f"\nEntrada inválida: {e}\n", file=sys.stderr)
         except LLMError as e:
             print(f"\nErro no serviço: {e}\n", file=sys.stderr)
 
+    logger.info("Aplicação encerrada.")
     return 0
 
 if __name__ == "__main__":
